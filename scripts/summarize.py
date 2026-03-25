@@ -54,18 +54,41 @@ podcast_potential 評分標準（1-5）：
 1 = 台灣脈絡關聯性較低"""
 
 
+def sanitize(text: str) -> str:
+    """將特殊 Unicode 字元替換為 ASCII 相近字元"""
+    if not text:
+        return text
+    replacements = {
+        '\u2014': '--',   # em dash
+        '\u2013': '-',    # en dash
+        '\u2018': "'",    # left single quote
+        '\u2019': "'",    # right single quote
+        '\u201c': '"',    # left double quote
+        '\u201d': '"',    # right double quote
+        '\u2026': '...',  # ellipsis
+        '\u00e9': 'e',    # é
+        '\u00e8': 'e',    # è
+        '\u00ea': 'e',    # ê
+        '\u00e0': 'a',    # à
+        '\u00e2': 'a',    # â
+    }
+    for char, replacement in replacements.items():
+        text = text.replace(char, replacement)
+    return text
+
+
 def summarize_article(client: anthropic.Anthropic, article: dict) -> dict | None:
     """呼叫 Claude API 生成單篇摘要"""
 
     user_message = f"""請為以下學術文章撰寫中文摘要：
 
-**來源期刊：** {article['source_name']}（{article['source_category']}）
-**文章標題：** {article['title']}
+**來源期刊：** {sanitize(article['source_name'])}（{sanitize(article['source_category'])}）
+**文章標題：** {sanitize(article['title'])}
 **發布日期：** {article['pub_date'][:10]}
 **原始連結：** {article['link']}
 
 **摘要/內文片段：**
-{article['abstract'] or '（此來源未提供摘要，請根據標題進行分析）'}"""
+{sanitize(article['abstract']) or '（此來源未提供摘要，請根據標題進行分析）'}"""
 
     try:
         response = client.messages.create(
