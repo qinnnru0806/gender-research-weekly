@@ -1,0 +1,66 @@
+name: 週報自動推播
+
+on:
+  # 每週一早上 09:00 台灣時間（= UTC 01:00）
+  schedule:
+    - cron: "0 1 * * 1"
+
+  # 也可以手動觸發（測試用）
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run（只生成摘要，不推播 LINE）"
+        required: false
+        default: "false"
+        type: choice
+        options:
+          - "false"
+          - "true"
+
+jobs:
+  weekly-digest:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # 需要 push 靜態網站到 gh-pages
+
+    steps:
+      - name: 📥 Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 🐍 Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: 🔍 Fetch RSS sources
+        run: python scripts/fetch_sources.py
+
+      - name: 🤖 Generate AI summaries
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python scripts/summarize.py
+
+      - name: 🌐 Generate static site
+        run: python scripts/generate_site.py
+
+      - name: 📲 Push LINE notification
+        if: ${{ github.event.inputs.dry_run != 'true' }}
+        env:
+          LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
+          LINE_GROUP_ID: ${{ secrets.LINE_GROUP_ID }}
+          SITE_URL: ${{ secrets.SITE_URL }}
+        run: python scripts/notify_line.py
+
+      - name: 💾 Commit data & site
+        run: |
+          git config user.name "gender-research-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add data/ docs/
+          git diff --staged --quiet || git commit -m "週報更新：$(date +'%Y-W%V')"
+          git push

@@ -1,0 +1,13 @@
+# 中間資料（由 Actions 自動生成）
+data/fetched_articles.json
+data/summaries.json
+
+# 但保留 seen_ids 和 weekly log（版本控制用）
+!data/seen_ids.json
+!data/weekly/
+
+# Python
+__pycache__/
+*.pyc
+.env
+venv/

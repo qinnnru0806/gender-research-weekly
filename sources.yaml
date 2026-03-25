@@ -1,0 +1,139 @@
+##############################################################
+#  性別研究週報 — 來源設定檔
+#  修改這裡即可新增 / 移除來源，不需要改程式碼
+##############################################################
+
+# 每週最多抓幾篇（超過則按日期取最新）
+max_items_per_run: 8
+
+# 最終推播精選幾篇到 LINE
+line_push_count: 5
+
+# 抓取幾天內的新文章（7 = 只抓本週新的）
+days_lookback: 7
+
+# ──────────────────────────────────────────
+#  學術期刊 RSS
+# ──────────────────────────────────────────
+journals:
+
+  # 🔵 男性研究
+  - name: "The Journal of Men's Studies"
+    url: "https://journals.sagepub.com/action/showFeed?jc=men&type=etoc&feed=rss"
+    category: "男性研究"
+    color: "🔵"
+
+  - name: "Men and Masculinities"
+    url: "https://journals.sagepub.com/action/showFeed?jc=jmm&type=etoc&feed=rss"
+    category: "男性研究"
+    color: "🔵"
+
+  - name: "NORMA: International Journal for Masculinity Studies"
+    url: "https://www.tandfonline.com/feed/rss/rnor20"
+    category: "男性研究"
+    color: "🔵"
+
+  - name: "Masculinities and Social Change (MCS)"
+    url: "https://hipatiapress.com/hpjournals/index.php/mcs/gateway/plugin/WebFeedGatewayPlugin/rss2"
+    category: "男性研究"
+    color: "🔵"
+
+  - name: "Psychology of Men & Masculinities"
+    url: "https://psycnet.apa.org/journals/men.rss"
+    category: "男性研究"
+    color: "🔵"
+
+  - name: "American Journal of Men's Health"
+    url: "https://journals.sagepub.com/action/showFeed?jc=ajmb&type=etoc&feed=rss"
+    category: "男性研究"
+    color: "🔵"
+
+  # 🔴 女性研究
+  - name: "Gender & Society"
+    url: "https://journals.sagepub.com/action/showFeed?jc=gas&type=etoc&feed=rss"
+    category: "女性研究"
+    color: "🔴"
+
+  - name: "Feminist Theory"
+    url: "https://journals.sagepub.com/action/showFeed?jc=fty&type=etoc&feed=rss"
+    category: "女性研究"
+    color: "🔴"
+
+  - name: "Journal of Gender Studies"
+    url: "https://www.tandfonline.com/feed/rss/cjgs20"
+    category: "女性研究"
+    color: "🔴"
+
+  - name: "Signs: Journal of Women in Culture and Society"
+    url: "https://www.journals.uchicago.edu/action/showFeed?jc=signs&type=etoc&feed=rss"
+    category: "女性研究"
+    color: "🔴"
+
+  # 🟡 同志研究
+  - name: "Journal of Homosexuality"
+    url: "https://www.tandfonline.com/feed/rss/wjhm20"
+    category: "同志研究"
+    color: "🟡"
+
+  - name: "GLQ: A Journal of Lesbian and Gay Studies"
+    url: "https://read.dukeupress.edu/glq/issue/rss"
+    category: "同志研究"
+    color: "🟡"
+
+  # 🟢 跨性別研究
+  - name: "TSQ: Transgender Studies Quarterly"
+    url: "https://read.dukeupress.edu/tsq/issue/rss"
+    category: "跨性別研究"
+    color: "🟢"
+
+  - name: "International Journal of Transgender Health"
+    url: "https://www.tandfonline.com/feed/rss/wijt21"
+    category: "跨性別研究"
+    color: "🟢"
+
+  # 🟣 跨類別
+  - name: "Journal of Sex Research"
+    url: "https://www.tandfonline.com/feed/rss/hjsr20"
+    category: "跨類別"
+    color: "🟣"
+
+  - name: "Feminist Media Studies"
+    url: "https://www.tandfonline.com/feed/rss/rfms20"
+    category: "跨類別"
+    color: "🟣"
+
+# ──────────────────────────────────────────
+#  搜尋關鍵字（用於 Google Scholar / Semantic Scholar API）
+# ──────────────────────────────────────────
+search_keywords:
+  - "Hegemonic masculinity"
+  - "Toxic masculinity"
+  - "Inclusive masculinity"
+  - "Men's help-seeking behavior"
+  - "Intersectionality gender"
+  - "Emotional labor gender"
+  - "Gender pay gap"
+  - "Reproductive justice"
+  - "Postfeminism"
+  - "Queer theory"
+  - "Homonationalism"
+  - "Sexual minority stress"
+  - "Gender dysphoria"
+  - "Gender-based violence"
+  - "Affirmative care model transgender"
+
+# ──────────────────────────────────────────
+#  台灣在地來源（之後可自行新增）
+# ──────────────────────────────────────────
+taiwan_sources:
+  - name: "婦研縱橫（台大婦女研究室）"
+    url: ""  # 填入 RSS 或網址
+    category: "台灣本地"
+    color: "🇹🇼"
+    note: "暫無 RSS，未來可改為爬蟲抓取"
+
+  # 如果你有其他台灣來源，在這裡新增：
+  # - name: "來源名稱"
+  #   url: "RSS 或網址"
+  #   category: "台灣本地"
+  #   color: "🇹🇼"
