@@ -5,18 +5,18 @@ summarize.py
 """
 
 import anthropic
-import sys
-
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
 import json
 import os
+import sys
 import time
 from pathlib import Path
 from datetime import datetime
+
+# 強制設定 stdout/stderr 為 UTF-8，避免特殊字元造成編碼錯誤
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+if hasattr(sys.stderr, 'reconfigure'):
+    sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
 
 SYSTEM_PROMPT = """你是「新世紀直男戰士」Podcast 的研究助理，專精性別研究與台灣性別議題脈絡。
@@ -96,16 +96,16 @@ def summarize_article(client: anthropic.Anthropic, article: dict) -> dict | None
         return summary
 
     except json.JSONDecodeError as e:
-        print(f"    ⚠️ JSON 解析失敗：{e}")
+        print(f"    [WARN] JSON 解析失敗：{e}")
         print(f"    原始回應：{raw[:200]}")
         return None
     except Exception as e:
-        print(f"    ❌ API 呼叫失敗：{e}")
+        print(f"    [FAIL] API 呼叫失敗：{e}")
         return None
 
 
 def main():
-    print("🤖 開始生成 AI 摘要...\n")
+    print("[START] 開始生成 AI 摘要...\n")
 
     api_key = os.environ.get("ANTHROPIC_API_KEY")
     if not api_key:
@@ -116,14 +116,14 @@ def main():
     # 讀取抓取到的文章
     input_path = "data/fetched_articles.json"
     if not os.path.exists(input_path):
-        print("❌ 找不到 fetched_articles.json，請先執行 fetch_sources.py")
+        print("[FAIL] 找不到 fetched_articles.json，請先執行 fetch_sources.py")
         return
 
     with open(input_path, "r", encoding="utf-8") as f:
         articles = json.load(f)
 
     if not articles:
-        print("⚠️ 本週沒有新文章，跳過摘要生成")
+        print("[SKIP] 本週沒有新文章，跳過摘要生成")
         # 建立空的摘要檔
         with open("data/summaries.json", "w", encoding="utf-8") as f:
             json.dump([], f)
@@ -131,13 +131,14 @@ def main():
 
     summaries = []
     for i, article in enumerate(articles, 1):
-        print(f"  [{i}/{len(articles)}] {article['source_color']} {article['title'][:50]}...")
+        safe_title = article['title'][:50].encode('ascii', errors='replace').decode('ascii')
+        print(f"  [{i}/{len(articles)}] {safe_title}...")
         summary = summarize_article(client, article)
         if summary:
             summaries.append(summary)
-            print(f"    ✅ 完成（節目潛力：{'⭐' * summary.get('podcast_potential', 1)}）")
+            print(f"    [OK] done (podcast_potential: {summary.get('podcast_potential', 1)})")
         else:
-            print(f"    ⏭️ 跳過此篇")
+            print(f"    [SKIP]")
 
         # 避免 rate limit
         if i < len(articles):
@@ -151,12 +152,12 @@ def main():
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(summaries, f, ensure_ascii=False, indent=2)
 
-    print(f"\n✅ 共生成 {len(summaries)} 篇摘要，儲存至 {output_path}")
+    print(f"\n[OK] 共生成 {len(summaries)} 篇摘要，儲存至 {output_path}")
 
     # 顯示本週精選預覽
-    print("\n📋 本週精選預覽：")
+    print("\n[INFO] 本週精選預覽：")
     for s in summaries[:5]:
-        print(f"  {s['source_color']} [{s.get('podcast_potential',1)}★] {s['title_zh']}")
+        print(f"  [{s.get('podcast_potential',1)}*] {s['title_zh']}")
         print(f"     → {s['tldr']}")
 
 
