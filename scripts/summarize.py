@@ -11,32 +11,37 @@ import time
 from pathlib import Path
 from datetime import datetime
 
-# ============================================================
-# 編碼修復：GitHub Actions runner 預設 LANG=C (ASCII only)
-# 必須在 import anthropic 之前就把環境設好
-# ============================================================
-os.environ["PYTHONIOENCODING"] = "utf-8"
-os.environ.setdefault("LANG", "en_US.UTF-8")
-os.environ.setdefault("LC_ALL", "en_US.UTF-8")
-
+# 強制 UTF-8（在 import anthropic 之前）
+# 注意：PYTHONIOENCODING 只在啟動時生效，所以也要在 shell 層設定
 if hasattr(sys.stdout, 'reconfigure'):
     sys.stdout.reconfigure(encoding='utf-8', errors='replace')
 if hasattr(sys.stderr, 'reconfigure'):
     sys.stderr.reconfigure(encoding='utf-8', errors='replace')
 
-import anthropic  # noqa: E402 — 必須在編碼設定之後 import
+import anthropic  # noqa: E402
 
 
-def safe_print(*args, **kwargs):
-    """
-    安全的 print：即使 stdout 是 ASCII 也不會炸。
-    所有非 ASCII 字元會被替換成 '?'。
-    """
+def safe_print(msg: str):
+    """絕對不會因為 encoding 而 crash 的 print"""
     try:
-        print(*args, **kwargs)
+        print(msg)
     except UnicodeEncodeError:
-        text = " ".join(str(a) for a in args)
-        print(text.encode("ascii", errors="replace").decode("ascii"), **kwargs)
+        # 最後防線：全部轉 ASCII
+        print(msg.encode("ascii", errors="replace").decode("ascii"))
+
+
+def safe_str(obj) -> str:
+    """安全地把任何物件轉成可 print 的字串"""
+    try:
+        s = str(obj)
+        # 測試是否能被 stdout 編碼
+        s.encode(sys.stdout.encoding or "ascii")
+        return s
+    except (UnicodeEncodeError, UnicodeDecodeError, LookupError):
+        try:
+            return repr(obj)
+        except Exception:
+            return "(cannot display error)"
 
 
 SYSTEM_PROMPT = """你是「新世紀直男戰士」Podcast 的研究助理，專精性別研究與台灣性別議題脈絡。
@@ -73,13 +78,10 @@ podcast_potential 評分標準（1-5）：
 2 = 學術上有趣但較難轉化為節目
 1 = 台灣脈絡關聯性較低"""
 
-# 使用 Sonnet 4.6：便宜、快、品質夠好
-# 如果想要更高品質可改成 "claude-opus-4-6"（費用較高）
 MODEL = "claude-sonnet-4-6"
 
 
 def sanitize(text: str) -> str:
-    """將特殊 Unicode 字元替換為安全字元"""
     if not text:
         return text
     replacements = {
@@ -93,28 +95,16 @@ def sanitize(text: str) -> str:
     return text
 
 
-def to_ascii(text: str) -> str:
-    """把任何字串轉成 ASCII safe（用於 print log）"""
-    if not text:
-        return ""
-    return text.encode("ascii", errors="replace").decode("ascii")
-
-
 def extract_json(raw: str) -> dict | None:
-    """從 Claude 回應中提取 JSON"""
     text = raw.strip()
-
-    # 移除 markdown code block
     if text.startswith("```"):
         lines = text.split("\n")
         lines = [l for l in lines if not l.strip().startswith("```")]
         text = "\n".join(lines).strip()
-
     start = text.find("{")
     end = text.rfind("}") + 1
     if start >= 0 and end > start:
         text = text[start:end]
-
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -122,8 +112,6 @@ def extract_json(raw: str) -> dict | None:
 
 
 def summarize_article(client: anthropic.Anthropic, article: dict, retry: int = 2) -> dict | None:
-    """呼叫 Claude API 生成單篇摘要"""
-
     user_message = f"""請為以下學術文章撰寫中文摘要：
 
 **來源期刊：** {sanitize(article['source_name'])}（{sanitize(article['source_category'])}）
@@ -142,13 +130,11 @@ def summarize_article(client: anthropic.Anthropic, article: dict, retry: int = 2
                 system=SYSTEM_PROMPT,
                 messages=[{"role": "user", "content": user_message}]
             )
-
             raw = response.content[0].text
             summary = extract_json(raw)
 
             if not summary:
                 safe_print(f"      [WARN] JSON parse fail (attempt {attempt+1})")
-                safe_print(f"      raw[:200]: {to_ascii(raw[:200])}")
                 if attempt < retry:
                     time.sleep(3)
                     continue
@@ -158,26 +144,21 @@ def summarize_article(client: anthropic.Anthropic, article: dict, retry: int = 2
             summary["link"] = article["link"]
             summary["source_name"] = article["source_name"]
             summary["source_category"] = article["source_category"]
-            summary["source_color"] = article.get("source_color", "📄")
+            summary["source_color"] = article.get("source_color", "")
             summary["pub_date"] = article["pub_date"][:10]
             summary["id"] = article["id"]
-
             return summary
 
         except anthropic.RateLimitError:
             wait = 15 * (attempt + 1)
             safe_print(f"      [WARN] Rate limit, wait {wait}s...")
             time.sleep(wait)
-        except anthropic.APIError as e:
-            safe_print(f"      [FAIL] API error: {to_ascii(str(e))}")
+        except Exception as e:
+            safe_print(f"      [FAIL] {safe_str(e)}")
             if attempt < retry:
                 time.sleep(5)
             else:
                 return None
-        except Exception as e:
-            safe_print(f"      [FAIL] Unexpected: {to_ascii(str(e))}")
-            return None
-
     return None
 
 
@@ -191,16 +172,12 @@ def main():
         safe_print("[FAIL] ANTHROPIC_API_KEY not set")
         sys.exit(1)
 
-    if not api_key.startswith("sk-ant-"):
-        safe_print("[WARN] API key format looks wrong (should start with sk-ant-)")
-
     client = anthropic.Anthropic(api_key=api_key)
 
-    # 測試 API 連線
     safe_print(f"  Model: {MODEL}")
-    safe_print(f"  Testing API connection...")
+    safe_print("  Testing API connection...")
     try:
-        test_resp = client.messages.create(
+        client.messages.create(
             model=MODEL,
             max_tokens=10,
             messages=[{"role": "user", "content": "Hi"}]
@@ -210,16 +187,15 @@ def main():
         safe_print("  [FAIL] Invalid API key")
         sys.exit(1)
     except anthropic.NotFoundError:
-        safe_print(f"  [FAIL] Model '{MODEL}' not found")
+        safe_print(f"  [FAIL] Model not found: {MODEL}")
         sys.exit(1)
     except Exception as e:
-        safe_print(f"  [FAIL] API test failed: {to_ascii(str(e))}")
+        safe_print(f"  [FAIL] API test failed: {safe_str(e)}")
         sys.exit(1)
 
-    # 讀取文章
     input_path = "data/fetched_articles.json"
     if not os.path.exists(input_path):
-        safe_print(f"[FAIL] {input_path} not found, run fetch_sources.py first")
+        safe_print(f"[FAIL] {input_path} not found")
         Path("data").mkdir(exist_ok=True)
         with open("data/summaries.json", "w", encoding="utf-8") as f:
             json.dump([], f)
@@ -229,23 +205,23 @@ def main():
         articles = json.load(f)
 
     if not articles:
-        safe_print("[SKIP] No articles to summarize (fetched_articles.json is empty)")
+        safe_print("[SKIP] No articles (fetched_articles.json is empty)")
         with open("data/summaries.json", "w", encoding="utf-8") as f:
             json.dump([], f)
         return
 
-    safe_print(f"  {len(articles)} articles to summarize\n")
+    safe_print(f"  {len(articles)} articles to summarize")
 
     summaries = []
     for i, article in enumerate(articles, 1):
-        safe_print(f"  [{i}/{len(articles)}] {to_ascii(article['title'][:60])}")
+        title_ascii = article['title'][:60].encode('ascii', errors='replace').decode('ascii')
+        safe_print(f"  [{i}/{len(articles)}] {title_ascii}")
         summary = summarize_article(client, article)
         if summary:
             summaries.append(summary)
             safe_print(f"      [OK] podcast_potential={summary.get('podcast_potential', 1)}")
         else:
-            safe_print(f"      [SKIP]")
-
+            safe_print("      [SKIP]")
         if i < len(articles):
             time.sleep(2)
 
@@ -255,15 +231,15 @@ def main():
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(summaries, f, ensure_ascii=False, indent=2)
 
-    safe_print(f"\n[OK] {len(summaries)} summaries saved to {output_path}")
+    safe_print(f"[OK] {len(summaries)} summaries saved to {output_path}")
 
     if summaries:
-        safe_print("\nTop picks:")
+        safe_print("Top picks:")
         for s in summaries[:5]:
-            safe_print(f"  [{s.get('podcast_potential',1)}] {to_ascii(s.get('title_zh',''))}")
-            safe_print(f"     {to_ascii(s.get('tldr',''))}")
-    else:
-        safe_print("\n[WARN] All articles failed, check API key and model name")
+            t = s.get('title_zh', '').encode('ascii', errors='replace').decode('ascii')
+            d = s.get('tldr', '').encode('ascii', errors='replace').decode('ascii')
+            safe_print(f"  [{s.get('podcast_potential',1)}] {t}")
+            safe_print(f"     {d}")
 
 
 if __name__ == "__main__":
