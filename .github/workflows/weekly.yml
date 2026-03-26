@@ -1,73 +1,73 @@
+##############################################################
+#  weekly.yml — 週報自動推播 workflow
+#  
+#  重要：在每個 run step 或整個 job 層級加上 env 設定
+#  解決 GitHub Actions runner 預設 ASCII 編碼問題
+##############################################################
+
 name: 週報自動推播
 
 on:
   schedule:
-    - cron: "0 1 * * 1"
+    - cron: '0 1 * * 1'   # UTC 01:00 = 台灣 09:00 每週一
   workflow_dispatch:
     inputs:
       dry_run:
-        description: "Dry run（只生成摘要，不推播 LINE）"
+        description: '只測試不推播 LINE'
         required: false
-        default: "false"
+        default: 'false'
         type: choice
         options:
-          - "false"
-          - "true"
+          - 'true'
+          - 'false'
+
+# ★★★ 這行是關鍵！在 job 層級設定，所有 step 都會繼承 ★★★
+env:
+  PYTHONIOENCODING: utf-8
+  PYTHONUTF8: 1
 
 jobs:
   weekly-digest:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: 📥 Checkout repo
+      - name: 📦 Checkout repo
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: 🐍 Setup Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
-          cache: "pip"
+          python-version: '3.12'
 
-      - name: 📦 Install dependencies
+      - name: 📚 Install dependencies
         run: pip install -r requirements.txt
 
-      - name: 🔍 Fetch RSS sources
+      - name: 📡 Fetch RSS sources
+        run: python scripts/fetch_sources.py
         env:
           PYTHONIOENCODING: utf-8
-          PYTHONUTF8: "1"
-        run: python scripts/fetch_sources.py
 
       - name: 🤖 Generate AI summaries
+        run: python scripts/summarize.py
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           PYTHONIOENCODING: utf-8
-          PYTHONUTF8: "1"
-        run: python scripts/summarize.py
 
       - name: 🌐 Generate static site
-        env:
-          PYTHONIOENCODING: utf-8
-          PYTHONUTF8: "1"
         run: python scripts/generate_site.py
 
       - name: 📲 Push LINE notification
         if: ${{ github.event.inputs.dry_run != 'true' }}
+        run: python scripts/notify_line.py
         env:
           LINE_CHANNEL_TOKEN: ${{ secrets.LINE_CHANNEL_TOKEN }}
           LINE_GROUP_ID: ${{ secrets.LINE_GROUP_ID }}
           SITE_URL: ${{ secrets.SITE_URL }}
-          PYTHONIOENCODING: utf-8
-          PYTHONUTF8: "1"
-        run: python scripts/notify_line.py
 
       - name: 💾 Commit data & site
         run: |
-          git config user.name "gender-research-bot"
-          git config user.email "bot@users.noreply.github.com"
-          git add data/ docs/
-          git diff --staged --quiet || git commit -m "週報更新：$(date +'%Y-W%V')"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --staged --quiet || git commit -m "📚 週報更新 $(date +%Y-W%V)"
           git push
