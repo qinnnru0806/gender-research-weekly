@@ -46,9 +46,8 @@ jobs:
         run: |
           export LANG=en_US.UTF-8
           export LC_ALL=en_US.UTF-8
-          python scripts/test_api.py || true
-          echo "--- api_error.txt ---"
-          cat api_error.txt 2>/dev/null || echo "(no error file)"
+          export PYTHONIOENCODING=utf-8
+          python scripts/summarize.py
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
 
